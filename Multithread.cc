@@ -8,6 +8,7 @@
 
 #include "ThreadCore.h"
 #include "GlobalFunctions.h"
+#include "SharedFunctions.h"
 
 using namespace v8;
 
@@ -84,6 +85,8 @@ static void onCreateThread(const FunctionCallbackInfo<Value>& info) {
 
 static void moduleInit(Local<Object> exports) {
     NODE_SET_METHOD(exports, "createThread", onCreateThread);
+    NODE_SET_METHOD(exports, "getSharedVariableValue", SharedFunctions::onGetSharedVariableValue);
+    NODE_SET_METHOD(exports, "setSharedVariableValue", SharedFunctions::onSetSharedVariableValue);
 }
 
 NODE_MODULE(MultithreadCore, moduleInit)

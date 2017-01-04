@@ -1,5 +1,7 @@
 #include <node.h>
 
+#include "SharedFunctions.h"
+
 #include <stdio.h>
 
 using namespace v8;
@@ -21,6 +23,14 @@ namespace GlobalFunctions {
         globalObject -> Set(
             String::NewFromUtf8(isolate, "_API_consoleLog"),
             FunctionTemplate::New(isolate, consoleLog)
+        );
+        globalObject -> Set(
+            String::NewFromUtf8(isolate, "_API_getSharedVariableValue"),
+            FunctionTemplate::New(isolate, SharedFunctions::onGetSharedVariableValue)
+        );
+        globalObject -> Set(
+            String::NewFromUtf8(isolate, "_API_setSharedVariableValue"),
+            FunctionTemplate::New(isolate, SharedFunctions::onSetSharedVariableValue)
         );
     }
 }

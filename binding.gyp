@@ -5,7 +5,9 @@
 			"sources": [
 				"Multithread.cc",
 				"ThreadCore.cc",
-				"GlobalFunctions.cc"
+				"SharedVariableManager.cc",
+				"GlobalFunctions.cc",
+				"SharedFunctions.cc"
 			]
 		}
 	]

@@ -13,3 +13,5 @@ function createThread(name, scriptPath) {
 }
 
 module.exports.createThread = createThread;
+module.exports.getSharedVariableValue = coreLib.getSharedVariableValue;
+module.exports.setSharedVariableValue = coreLib.setSharedVariableValue;

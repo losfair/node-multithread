@@ -11,4 +11,6 @@ console.log(JSON.stringify({
     "time": endTime - startTime
 }));
 
+sharedVariables.set("test", result);
+
 console.log("Worker done");
