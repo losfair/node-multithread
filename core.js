@@ -4,11 +4,15 @@ const path = require("path");
 
 const initializerCode = fs.readFileSync(path.join(__dirname, "api.js"), "utf-8");
 
-function createThread(name, scriptPath) {
+function createThread(name, scriptPath, cb) {
     let scriptCode = fs.readFileSync(scriptPath, "utf-8");
+
+    if(!cb) cb = () => {};
+
     coreLib.createThread(
         name,
-        initializerCode + scriptCode
+        initializerCode + scriptCode,
+        cb
     );
 }
 
