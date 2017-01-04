@@ -1,0 +1,33 @@
+{
+  "name": "multithread",
+  "version": "0.1.0",
+  "description": "Multithread for Node",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install": "node-gyp rebuild"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/losfair/node-multithread.git"
+  },
+  "keywords": [
+    "multithread",
+    "thread",
+    "async",
+    "multi"
+  ],
+  "files": [
+    "*.cc",
+    "*.h",
+    "*.js",
+    "binding.gyp"
+  ],
+  "author": "Heyang Zhou",
+  "license": "LGPL-3.0",
+  "gypfile": true,
+  "bugs": {
+    "url": "https://github.com/losfair/node-multithread/issues"
+  },
+  "homepage": "https://github.com/losfair/node-multithread#readme"
+}
