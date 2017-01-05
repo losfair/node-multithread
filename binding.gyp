@@ -8,7 +8,8 @@
 				"SharedVariableManager.cc",
 				"WorkerGlobals.cc",
 				"SharedFunctions.cc",
-				"CallbackOnMessage.cc"
+				"CallbackOnMessage.cc",
+				"V8Instance.cc"
 			]
 		}
 	]

@@ -4,6 +4,8 @@
 #include <string>
 #include <map>
 #include <functional>
+#include <atomic>
+#include <mutex>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +14,7 @@
 #include "WorkerGlobals.h"
 #include "SharedFunctions.h"
 #include "CallbackOnMessage.h"
+#include "V8Instance.h"
 
 using namespace v8;
 
@@ -45,6 +48,29 @@ static std::string loadScript(Isolate *isolate, Local<Context>& cxt, const std::
     return std::string(*String::Utf8Value(result -> ToString()));
 }
 
+std::atomic<int> totalThreadCount(0);
+const int maxTotalThreadCount = 8;
+
+V8Instance *v8Instances = NULL;
+
+V8Instance * getNextAvailableV8Instance() {
+    for(int i = 0; i < maxTotalThreadCount; i++) {
+        if(v8Instances[i].available) {
+            return &v8Instances[i];
+        }
+    }
+    return NULL;
+}
+
+static void initV8Instances() {
+    v8Instances = new V8Instance[maxTotalThreadCount];
+    for(int i = 0; i < maxTotalThreadCount; i++) {
+        Isolate::CreateParams isolateParams;
+        isolateParams.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
+        v8Instances[i].isolate = Isolate::New(isolateParams);
+    }
+}
+
 static void uvCallbackFromThread(uv_async_t *handle) {
     if(!handle -> data) return;
 
@@ -53,30 +79,42 @@ static void uvCallbackFromThread(uv_async_t *handle) {
 
     std::function<void(const CallbackOnMessage::CallbackArgs *)>& cb = args -> target;
 
-    cb(args);
-
     if(args -> type == CallbackOnMessage::MESSAGE_TYPE_DONE) {
         uv_close((uv_handle_t *) handle, (uv_close_cb) free);
         ThreadCore::joinThread(args -> sourceThreadName);
         ThreadCore::removeThread(args -> sourceThreadName);
+        totalThreadCount--;
+
+        if(args -> v8Instance) {
+            args -> v8Instance -> available = true;
+        }
     }
+
+    cb(args);
 
     delete args;
 }
 
-static std::function<void()> newV8Thread(std::string& threadName, std::string& targetCode, std::function<void(const CallbackOnMessage::CallbackArgs *)> callbackOnMessage) {
-    uv_async_t *asyncContext = (uv_async_t *) malloc(sizeof(uv_async_t));
-    uv_loop_t *defaultLoop = uv_default_loop();
-
-    asyncContext -> data = NULL;
-
-    uv_async_init(defaultLoop, asyncContext, uvCallbackFromThread);
-
+static std::function<void()> newV8Thread(uv_async_t *asyncContext, std::string& threadName, std::string& targetCode, std::function<void(const CallbackOnMessage::CallbackArgs *)> callbackOnMessage) {
     return [threadName, targetCode, asyncContext, callbackOnMessage]() {
-        Isolate::CreateParams isolateParams;
-        isolateParams.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
+        V8Instance *targetInstance = getNextAvailableV8Instance();
 
-        Isolate *newIsolate = Isolate::New(isolateParams);
+        if(!targetInstance) {
+            std::string errMsg("No V8 instance available");
+            asyncContext -> data = (void *) new CallbackOnMessage::CallbackArgs(
+                threadName,
+                NULL,
+                callbackOnMessage,
+                errMsg,
+                CallbackOnMessage::MESSAGE_TYPE_DONE
+            );
+            uv_async_send(asyncContext);
+            return;
+        }
+
+        targetInstance -> available = false;
+
+        Isolate *newIsolate = targetInstance -> isolate;
 
         std::string result;
 
@@ -95,10 +133,9 @@ static std::function<void()> newV8Thread(std::string& threadName, std::string& t
             result = loadScript(newIsolate, newContext, targetCode);
         }
 
-        newIsolate -> Dispose();
-
         asyncContext -> data = (void *) new CallbackOnMessage::CallbackArgs(
             threadName,
+            targetInstance,
             callbackOnMessage,
             result,
             CallbackOnMessage::MESSAGE_TYPE_DONE
@@ -120,6 +157,11 @@ static void onCreateThread(const FunctionCallbackInfo<Value>& info) {
         return;
     }
 
+    if(totalThreadCount >= maxTotalThreadCount) {
+        isolate -> ThrowException(String::NewFromUtf8(isolate, "Too many threads"));
+        return;
+    }
+
     Local<String> _threadName = info[0] -> ToString();
     std::string threadName = *String::Utf8Value(_threadName);
 
@@ -129,9 +171,16 @@ static void onCreateThread(const FunctionCallbackInfo<Value>& info) {
     Local<Function> _cb = Local<Function>::Cast(info[2]);
     Persistent<Function, CopyablePersistentTraits<Function>> cb(isolate, _cb);
 
-    ThreadCore::createThread(
+    uv_async_t *asyncContext = (uv_async_t *) malloc(sizeof(uv_async_t));
+    uv_loop_t *defaultLoop = uv_default_loop();
+
+    asyncContext -> data = NULL;
+
+    uv_async_init(defaultLoop, asyncContext, uvCallbackFromThread);
+
+    bool createResult = ThreadCore::createThread(
         threadName,
-        newV8Thread(threadName, targetCode, [cb](const CallbackOnMessage::CallbackArgs *msg) {
+        newV8Thread(asyncContext, threadName, targetCode, [cb](const CallbackOnMessage::CallbackArgs *msg) {
             Isolate *isolate = Isolate::GetCurrent();
             HandleScope currentScope(isolate);
 
@@ -145,10 +194,26 @@ static void onCreateThread(const FunctionCallbackInfo<Value>& info) {
             ((Persistent<Function, CopyablePersistentTraits<Function> >) cb).Reset();
         })
     );
+
+    if(!createResult) {
+        uv_close((uv_handle_t *) asyncContext, (uv_close_cb) free);
+        isolate -> ThrowException(String::NewFromUtf8(isolate, "Thread creation failed"));
+    }
+
+    totalThreadCount++;
+}
+
+static void onGetMaxThreadCount(const FunctionCallbackInfo<Value>& info) {
+    Isolate *isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, maxTotalThreadCount));
 }
 
 static void moduleInit(Local<Object> exports) {
+    initV8Instances();
+
     NODE_SET_METHOD(exports, "createThread", onCreateThread);
+    NODE_SET_METHOD(exports, "getMaxThreadCount", onGetMaxThreadCount);
     NODE_SET_METHOD(exports, "getSharedVariableValue", SharedFunctions::onGetSharedVariableValue);
     NODE_SET_METHOD(exports, "setSharedVariableValue", SharedFunctions::onSetSharedVariableValue);
 }

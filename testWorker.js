@@ -1,10 +1,14 @@
+"use strict";
+
+console.log(Date.now());
+
 console.log("Thread started: " + __THREAD_NAME__);
 
 let startTime = Date.now();
 
 let result = 0;
 
-for(let i = 0; i < 1000000; i++) result += Math.random();
+for(let i = 0; i < 10000000; i++) result += Math.random();
 
 let endTime = Date.now();
 
