@@ -6,6 +6,8 @@
 
 namespace ThreadCore {
     bool createThread(std::string threadName, std::function<void()> payload);
+    bool joinThread(std::string threadName);
+    bool removeThread(std::string threadName);
 }
 
 #endif

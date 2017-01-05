@@ -6,7 +6,7 @@
 
 using namespace v8;
 
-namespace GlobalFunctions {
+namespace WorkerGlobals {
     static void consoleLog(const FunctionCallbackInfo<Value>& info) {
         if(
             info.Length() != 1
@@ -19,7 +19,11 @@ namespace GlobalFunctions {
         printf("%s\n", *_msg);
     }
 
-    void init(Isolate *isolate, Local<ObjectTemplate>& globalObject) {
+    void init(Isolate *isolate, Local<ObjectTemplate>& globalObject, const std::string& threadName) {
+        globalObject -> Set(
+            String::NewFromUtf8(isolate, "__THREAD_NAME__"),
+            String::NewFromUtf8(isolate, threadName.c_str())
+        );
         globalObject -> Set(
             String::NewFromUtf8(isolate, "_API_consoleLog"),
             FunctionTemplate::New(isolate, consoleLog)

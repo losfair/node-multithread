@@ -6,8 +6,9 @@
 				"Multithread.cc",
 				"ThreadCore.cc",
 				"SharedVariableManager.cc",
-				"GlobalFunctions.cc",
-				"SharedFunctions.cc"
+				"WorkerGlobals.cc",
+				"SharedFunctions.cc",
+				"CallbackOnMessage.cc"
 			]
 		}
 	]

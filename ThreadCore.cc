@@ -23,6 +23,24 @@ namespace ThreadCore {
         return true;
     }
 
+    bool joinThread(std::string threadName) {
+        thread_info_global_lock.lock();
+
+        auto itr = threads.find(threadName);
+
+        if(itr == threads.end()) { // A thread with the given name doesn't exist
+            thread_info_global_lock.unlock();
+            return false;
+        }
+
+        std::thread *targetThread = itr -> second;
+        thread_info_global_lock.unlock();
+
+        targetThread -> join();
+        
+        return true;
+    }
+
     bool removeThread(std::string threadName) {
         thread_info_global_lock.lock();
 
@@ -40,6 +58,5 @@ namespace ThreadCore {
 
         thread_info_global_lock.unlock();
         return true;
-
     }
 }
